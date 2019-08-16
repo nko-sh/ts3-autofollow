@@ -23,8 +23,8 @@
 
 static struct TS3Functions ts3Functions;
 
-int isActive = 0;
-anyID followerId;
+static int isActive = 1;
+static anyID followerId;
 
 #ifdef _WIN32
 #define _strcpy(dest, destSize, src) strcpy_s(dest, destSize, src)
@@ -33,7 +33,7 @@ anyID followerId;
 #define _strcpy(dest, destSize, src) { strncpy(dest, src, destSize-1); (dest)[destSize-1] = '\0'; }
 #endif
 
-#define PLUGIN_API_VERSION 22
+#define PLUGIN_API_VERSION 23
 
 #define PATH_BUFSIZE 512
 #define COMMAND_BUFSIZE 128
@@ -328,6 +328,29 @@ void ts3plugin_initHotkeys(struct PluginHotkey*** hotkeys) {
 	/* The client will call ts3plugin_freeMemory to release all allocated memory */
 }
 
+/* Auto follow logic here */
+void try_follow_client(uint64 serverConnectionHandlerID, anyID clientID, uint64 newChannelID) {
+	/* Cancel if not active */
+	if (isActive == 0) {
+		return;
+	}
+
+	/* Cancel if not following */
+	if (clientID != followerId) {
+		return;
+	}
+
+	anyID ownId = ts3Functions.getClientID(serverConnectionHandlerID, &ownId);
+
+	/* Cancel if following self */
+	if (followerId == ownId) {
+		return;
+	}
+
+	/* Switch to channel */
+	ts3Functions.requestClientMove(serverConnectionHandlerID, ownId, newChannelID, "", NULL);
+}
+
 /************************** TeamSpeak callbacks ***************************/
 /*
  * Following functions are optional, feel free to remove unused callbacks.
@@ -360,27 +383,8 @@ void ts3plugin_onUpdateChannelEditedEvent(uint64 serverConnectionHandlerID, uint
 void ts3plugin_onUpdateClientEvent(uint64 serverConnectionHandlerID, anyID clientID, anyID invokerID, const char* invokerName, const char* invokerUniqueIdentifier) {
 }
 
-/* Auto follow logic here */
 void ts3plugin_onClientMoveEvent(uint64 serverConnectionHandlerID, anyID clientID, uint64 oldChannelID, uint64 newChannelID, int visibility, const char* moveMessage) {
-	/* Cancel if not active */
-	if (isActive == 0) {
-		return;
-	}
-
-	/* Cancel if not following */
-	if (clientID != followerId) {
-		return;
-	}
-
-	anyID ownId = ts3Functions.getClientID(serverConnectionHandlerID, &ownId);
-
-	/* Cancel if following self */
-	if (followerId == ownId) {
-		return;
-	}
-
-	/* Switch to channel */
-	ts3Functions.requestClientMove(serverConnectionHandlerID, ownId, newChannelID, "", NULL);
+	try_follow_client(serverConnectionHandlerID, clientID, newChannelID);
 }
 
 void ts3plugin_onClientMoveSubscriptionEvent(uint64 serverConnectionHandlerID, anyID clientID, uint64 oldChannelID, uint64 newChannelID, int visibility) {
@@ -390,9 +394,11 @@ void ts3plugin_onClientMoveTimeoutEvent(uint64 serverConnectionHandlerID, anyID 
 }
 
 void ts3plugin_onClientMoveMovedEvent(uint64 serverConnectionHandlerID, anyID clientID, uint64 oldChannelID, uint64 newChannelID, int visibility, anyID moverID, const char* moverName, const char* moverUniqueIdentifier, const char* moveMessage) {
+	try_follow_client(serverConnectionHandlerID, clientID, newChannelID);
 }
 
 void ts3plugin_onClientKickFromChannelEvent(uint64 serverConnectionHandlerID, anyID clientID, uint64 oldChannelID, uint64 newChannelID, int visibility, anyID kickerID, const char* kickerName, const char* kickerUniqueIdentifier, const char* kickMessage) {
+	try_follow_client(serverConnectionHandlerID, clientID, newChannelID);
 }
 
 void ts3plugin_onClientKickFromServerEvent(uint64 serverConnectionHandlerID, anyID clientID, uint64 oldChannelID, uint64 newChannelID, int visibility, anyID kickerID, const char* kickerName, const char* kickerUniqueIdentifier, const char* kickMessage) {
