@@ -1,4 +1,5 @@
-# TS3 Auto Follow
+# ts3-autofollow
+[![C](https://img.shields.io/badge/language-C-blue.svg)](https://en.wikipedia.org/wiki/C_(programming_language))
 
 Follow clients with just a few clicks.
 
